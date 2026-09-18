@@ -29,7 +29,7 @@
 
 extern void	menu_help(short title, short item);
 
-static char	buffer[MAX_LINE_LEN];
+static QED_NEAR char	buffer[MAX_LINE_LEN];
 
 
 /*
@@ -299,7 +299,7 @@ void set_global_options(void)
 /*
  * Klammerpaare
 */
-char	klammer_auf[11],
+QED_NEAR char	klammer_auf[11],
 		klammer_zu[11];
 
 void set_klammer_options(void)
@@ -429,7 +429,7 @@ static void config_muster(void)
 			strcpy(local_options[i + 2 - MFIRST].muster, str);
 		}
 
-		/* wurde der aktive gelîscht? */
+		/* wurde der aktive gelÔøΩscht? */
 		if (local_options[active_local_option].muster[0] == EOS)
 		{
 			active_local_option = 0;
@@ -488,7 +488,24 @@ void set_local_options(void)
 	{
 		TEXTP t_ptr = get_text(window->handle);
 
-		active_local_option = (short)(t_ptr->loc_opt - local_options);
+		/* gem4xe port: the plain pointer difference t_ptr->loc_opt -
+		 * local_options makes Calypsi emit local_options' address as a
+		 * 16-bit immediate (its far-arithmetic limit), which overflows for
+		 * a far array, and a cast does not change it.  local_options is
+		 * 12 KB, too big to place near (see QED_NEAR in options.h), so
+		 * recover the index by pointer EQUALITY -- no arithmetic, no
+		 * symbol immediate -- over the twenty entries.  Same result
+		 * everywhere; this runs only when an editor window activates. */
+		{
+			short qi;
+			active_local_option = 0;
+			for (qi = 0; qi < LOCAL_ANZ; qi++)
+				if (t_ptr->loc_opt == &local_options[qi])
+				{
+					active_local_option = qi;
+					break;
+				}
+		}
 	}
 
 	option_fill();
@@ -646,7 +663,7 @@ static void get_syntax_settings(int txtidx, int idx)
 	char str[256];
 	HL_RULEINFO ri;
 
-	if (!Hl_EnumRules(txtidx, &ri, &idx)) /* idx wird zerstîrt */
+	if (!Hl_EnumRules(txtidx, &ri, &idx)) /* idx wird zerstÔøΩrt */
 	{
 		disable_syntax_settings(TRUE);
 		return;
@@ -917,7 +934,7 @@ void init_default_var(void)
 	local_options[0].backup = FALSE;
 	local_options[0].show_end = FALSE;
 
-	/* Default 2: BinÑr */
+	/* Default 2: BinÔøΩr */
 	strcpy(local_options[1].muster, rsc_string(BINSTR));
 	local_options[1].tab = FALSE;
 	local_options[1].tabsize = 1;
@@ -1064,7 +1081,7 @@ static void parse_line(POSENTRY **arglist, char *zeile)
 		else if(strcmp(var, "AutoSaveTextMin") == 0)
 			as_text_min = atoi(buffer);
 
-		/* BinÑr-Extensions */
+		/* BinÔøΩr-Extensions */
 		else if (strcmp(var, "BinExtension") == 0)
 		{
 			read_cfg_str(buffer, tmp);
@@ -1147,7 +1164,7 @@ static void parse_line(POSENTRY **arglist, char *zeile)
 		{
 			read_cfg_str(buffer, tmp);
 
-			/* SonderfÑlle */
+			/* SonderfÔøΩlle */
 			if (strcmp(tmp, "*") == 0)
 				muster_nr = 0;
 			else if (strcmp(tmp, rsc_string(BINSTR)) == 0)
@@ -1360,7 +1377,7 @@ void option_load(POSENTRY **list)
 		fclose(fd);
 		fd = NULL;
 
-		/* Farb-abhÑngige Parameter laden */
+		/* Farb-abhÔøΩngige Parameter laden */
 		split_filename(cfg_path, tmp, NULL);
 		strcat(tmp, col_name);
 		fd = fopen(tmp, "r");
@@ -1392,7 +1409,7 @@ void option_load(POSENTRY **list)
 
 		}
 
-		/* Auflîsungs-abhÑngige Parameter laden */
+		/* AuflÔøΩsungs-abhÔøΩngige Parameter laden */
 		split_filename(cfg_path, tmp, NULL);
 		strcat(tmp, dsp_name);
 		fd = fopen(tmp, "r");
@@ -1424,7 +1441,7 @@ void option_load(POSENTRY **list)
 
 		}
 
-		/* Zum Schluû noch 'pdlg.qed' */
+		/* Zum SchluÔøΩ noch 'pdlg.qed' */
 		prn_get_cfg("PdlgRead", cfg_path);
 	}
 }
@@ -1435,7 +1452,7 @@ void option_load(POSENTRY **list)
 /******************************************************************************/
 void write_cfg_str(char *var, char *value)
 {
-	if (strchr(value, '\"') != NULL)	/* " in value fÅhrt zu \" in der Datei */
+	if (strchr(value, '\"') != NULL)	/* " in value fÔøΩhrt zu \" in der Datei */
 	{
 		short	len, i;
 
@@ -1509,7 +1526,7 @@ void option_save(void)
 	write_cfg_bool("AutoSaveTextAsk", as_text_ask);
 	write_cfg_int("AutoSaveTextMin", as_text_min);
 
-	/* BinÑr-Extionsions */
+	/* BinÔøΩr-Extionsions */
 	for (i = 4; i < BIN_ANZ; i++)
 		if (bin_extension[i][0] != EOS)
 			write_cfg_str("BinExtension", bin_extension[i]);
@@ -1631,7 +1648,7 @@ void option_save(void)
 	fclose(fd);
 	fd = NULL;
 
-	/* Farb-abhÑngige Parameter sichern */
+	/* Farb-abhÔøΩngige Parameter sichern */
 	split_filename(cfg_path, path, NULL);
 	strcat(path, col_name);
 	fd = fopen(path, "w");

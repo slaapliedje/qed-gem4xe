@@ -1,7 +1,9 @@
 #include "global.h"
 #include "set.h"
 
-static char bits[] = {128, 64, 32, 16, 8, 4, 2, 1};
+/* bits[] was the byte-at-a-time bit table setincl/setin and friends used;
+ * they index the longs directly now (see the note above setincl), and
+ * nothing else wanted it. */
 
 /*****************************************************************************/
 
@@ -158,10 +160,37 @@ void setxor (SET set1, SET set2)
 
 /*****************************************************************************/
 
+/*
+ * ENDIANNESS.  These four reached the set through a char pointer --
+ *
+ *	*((char *)set + (elt >> 3)) |= bits[elt & 7];
+ *
+ * -- which puts element 0 in BYTE 0, bit 7.  setfree(), setmin() and
+ * setmax() read the same storage as `unsigned long` and take element 0 to
+ * be BIT 31 of the first long: they shift left until the value reaches
+ * 0x80000000, counting as they go.  The two views agree only where byte 0
+ * of a long is its most significant byte -- on a big-endian machine like
+ * the 68000.
+ *
+ * On a little-endian one, which the 65C816 this is ported to is, they do
+ * not.  setincl(s,1) set bit 7 of the long; setmin(s) and setmax(s) then
+ * both answered 24, and setin(s,24) was false.  restore_edit() walks
+ * chg_links in exactly that way -- setmin() to setmax(), testing setin()
+ * -- so its loop body never ran once: every change char_insert queued was
+ * recorded and none of them was ever drawn.  A typed character went into
+ * the document and nothing appeared on the screen.
+ *
+ * Indexing the longs directly makes the two views agree whatever the byte
+ * order, and keeps the numbering the long-based functions already use, so
+ * nothing else in this file changes.
+ */
+#define SET_WORD(elt)	((short)((elt) >> 5))
+#define SET_MASK(elt)	(0x80000000UL >> ((elt) & 31))
+
 void setincl (SET set, short elt)
 {
 	if (elt >= 0 && elt <= SETMAX)
-		*((char*)set + (elt >> 3)) |= bits[elt & 7];
+		set[SET_WORD(elt)] |= SET_MASK(elt);
 }
 
 /*****************************************************************************/
@@ -169,7 +198,7 @@ void setincl (SET set, short elt)
 void setexcl (SET set, short elt)
 {
 	if (elt>=0 && elt<=SETMAX)
-		*((char*)set+(elt>>3)) &= ~bits[elt&7];
+		set[SET_WORD(elt)] &= ~SET_MASK(elt);
 }
 
 /*****************************************************************************/
@@ -177,7 +206,7 @@ void setexcl (SET set, short elt)
 void setchg (SET set, short elt)
 {
 	if (elt>=0 && elt<=SETMAX)
-		*((char*)set+(elt>>3)) ^= bits[elt&7];
+		set[SET_WORD(elt)] ^= SET_MASK(elt);
 }
 
 /*****************************************************************************/
@@ -185,7 +214,7 @@ void setchg (SET set, short elt)
 bool setin (SET set, short elt)
 {
 	if (elt >= 0 && elt <= SETMAX)
-		return ((*((char *)set + (elt >> 3)) & bits[elt & 7]) ? TRUE : FALSE);
+		return ((set[SET_WORD(elt)] & SET_MASK(elt)) ? TRUE : FALSE);
 	else
 		return (FALSE);
 }

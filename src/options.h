@@ -1,6 +1,22 @@
 #ifndef _qed_options_h_
 #define _qed_options_h_
 
+/* QED_NEAR -- gem4xe port.  A few of these globals are used in a pointer
+ * DIFFERENCE (p - klammer_auf in block.c) or otherwise reached in a way
+ * that makes Calypsi emit the array's address as a 16-bit immediate.
+ * Under --data-model=large the array is in a far bank, so that immediate
+ * overflows at link (Calypsi's far arithmetic is 16-bit: it should emit
+ * .word0, but range-checks the whole 24-bit address).  Placing just these
+ * few small arrays near keeps the arithmetic genuinely 16-bit and the
+ * relocation valid.  Guarded, so the m68k build is unchanged. */
+#ifndef QED_NEAR
+# ifdef __CALYPSI__
+#  define QED_NEAR __near
+# else
+#  define QED_NEAR
+# endif
+#endif
+
 /* 
  * Autosave 
 */
@@ -30,7 +46,7 @@ extern void		set_syntax_options	(void);
 /*
  * Klammerpaare
 */
-extern char	klammer_auf[],
+extern QED_NEAR char	klammer_auf[],
 				klammer_zu[];
 
 extern void	set_klammer_options(void);
