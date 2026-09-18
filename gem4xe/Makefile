@@ -207,6 +207,13 @@ $(B)/QED.ATR: $(B)/QED.G4A $(B)/QED.RSC $(GEM4XE_XEX)
 	    --add $(B)/QED.G4A DESKTOP.G4A \
 	    --add $(B)/QED.RSC QED.RSC
 
+# A recording of QED being used, for showing people: build/movie/qed.mp4
+# and .gif.  Every frame is the emulated machine, driven the way the gate
+# drives it; the boot is deliberately not in shot.
+demo: $(B)/QED.ATR
+	@test -n "$(GEM4XE_CART)" || { echo "no SpartaDOS X cartridge: set [spartados].sdx_cart in $(GEM4XE)/fixtures.toml"; exit 1; }
+	@GEM4XE="$(GEM4XE)" SDX_CART="$(GEM4XE_CART)" python3 tools/qed_demo.py
+
 check: $(B)/QED.ATR
 	@test -n "$(GEM4XE_CART)" || { echo "no SpartaDOS X cartridge: set [spartados].sdx_cart in $(GEM4XE)/fixtures.toml"; exit 1; }
 	@GEM4XE="$(GEM4XE)" GEM4XE_SYM="$(GEM4XE_SYM)" python3 tools/ci_gem4xe.py "$(GEM4XE_CART)"
@@ -222,5 +229,5 @@ compile: $(KIT)/include/gem.h
 clean:
 	rm -rf $(B)
 
-.PHONY: all compile check clean
+.PHONY: all compile check demo clean
 .DEFAULT_GOAL := all
