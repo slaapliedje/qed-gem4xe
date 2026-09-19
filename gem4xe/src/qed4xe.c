@@ -358,117 +358,13 @@ void norm_to_gem(unsigned long norm, _WORD *ks, _WORD *kr)
     if (kr) *kr = ret;
 }
 
-/* -- non-ISO string functions ------------------------------------------- */
-
-int stricmp(const char *a, const char *b)
-{
-    int ca, cb;
-    do {
-        ca = tolower((unsigned char)*a);
-        cb = tolower((unsigned char)*b);
-        if (ca != cb)
-            return ca - cb;
-        a++; b++;
-    } while (ca != 0);
-    return 0;
-}
-
-int strnicmp(const char *a, const char *b, size_t n)
-{
-    int ca, cb;
-    while (n-- > 0) {
-        ca = tolower((unsigned char)*a);
-        cb = tolower((unsigned char)*b);
-        if (ca != cb)
-            return ca - cb;
-        if (ca == 0)
-            break;
-        a++; b++;
-    }
-    return 0;
-}
-
-char *strlwr(char *s)
-{
-    char *p;
-    for (p = s; *p; p++)
-        *p = (char)tolower((unsigned char)*p);
-    return s;
-}
-
+/* -- itoa, which mintlib has and ISO C does not.  The kit carries
+ * stricmp/strnicmp/strlwr and opendir/readdir/closedir now
+ * (gem4xe include/support.h, include/dirent.h), so only this is
+ * left here. */
 char *itoa(int value, char *buf, int radix)
 {
     return ltoa((long)value, buf, radix);
-}
-
-/* -- directories, over Fsfirst and Fsnext --------------------------------- */
-
-/* Each DIR carries its own DTA and sets it around every call, and the
- * caller's DTA is put back after, so a directory walk in progress
- * elsewhere (cflib's fsexists, say) is not disturbed. */
-DIR *opendir(const char *path)
-{
-    DIR *d = (DIR *)malloc(sizeof(DIR));
-    char spec[130];
-    DTA *old;
-    size_t n;
-    LONG r;
-
-    if (d == 0)
-        return 0;
-    n = strlen(path);
-    if (n > sizeof(spec) - 5)
-        n = sizeof(spec) - 5;
-    memcpy(spec, path, n);
-    if (n > 0 && spec[n - 1] != '\\' && spec[n - 1] != ':')
-        spec[n++] = '\\';
-    strcpy(spec + n, "*.*");
-
-    old = Fgetdta();
-    Fsetdta(&d->dta);
-    r = Fsfirst(spec, 0x17);            /* files, and read-only/hidden/system/directories */
-    Fsetdta(old);
-
-    d->first = 1;
-    d->done = 0;
-    d->ent.d_name[0] = '\0';
-    if (r == ENMFIL) {
-        d->done = 1;                    /* an empty directory is still a directory */
-    } else if (r < 0) {
-        free(d);
-        return 0;
-    }
-    return d;
-}
-
-struct dirent *readdir(DIR *d)
-{
-    DTA *old;
-    LONG r;
-
-    if (d == 0 || d->done)
-        return 0;
-    if (d->first) {
-        d->first = 0;                   /* Fsfirst's answer, held since opendir */
-    } else {
-        old = Fgetdta();
-        Fsetdta(&d->dta);
-        r = Fsnext();
-        Fsetdta(old);
-        if (r < 0) {
-            d->done = 1;
-            return 0;
-        }
-    }
-    strncpy(d->ent.d_name, d->dta.d_fname, sizeof(d->ent.d_name) - 1);
-    d->ent.d_name[sizeof(d->ent.d_name) - 1] = '\0';
-    return &d->ent;
-}
-
-int closedir(DIR *d)
-{
-    free(d);
-    return 0;
 }
 
 /* -- the file selector ----------------------------------------------------- */

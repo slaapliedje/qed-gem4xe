@@ -257,9 +257,6 @@ KEYTAB *Keytbl(void *unshift, void *shift, void *capslock);
 
 /* -- non-ISO string functions QED reaches -------------------------------- */
 
-int   stricmp(const char *a, const char *b);
-int   strnicmp(const char *a, const char *b, size_t n);
-char *strlwr(char *s);
 char *itoa(int value, char *buf, int radix);
 char *ltoa(long value, char *buf, int radix);           /* cflib/cflibc.c */
 

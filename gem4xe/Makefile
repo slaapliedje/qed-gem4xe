@@ -55,14 +55,26 @@ MODEL = --code-model=large --data-model=large -O2
 # them before any header of ours is reached, so they come from the command
 # line (cflib4xe FINDINGS.md 7).  QED uses _WORD too.
 DEFS  = -D_WORD=short -D"_UWORD=unsigned short"
-# include/ first: its gem.h is the door.  The kit's directory is still on
+# include/ first: its gem.h is the door.  Everything else this port
+# used to keep there -- osbind.h, mintbind.h, gemx.h, macros.h, support.h,
+# strings.h, dirent.h -- is the KIT's now, which is the whole point of
+# having written them twice: the next port does not.
+#
+# cflib/ IS BEFORE THE KIT, and that ordering is load-bearing.  cflib's
+# intern.h takes <tos.h> when the compiler is not GCC, so cflib/tos.h is
+# standing in for the ST's system header and carries cflib's own
+# CF_GEMPARBLK with it.  The kit ships a <tos.h> too (it is one of the two
+# names an ST source uses), and with the kit first the kit's wins and
+# cflib stops compiling.  A port's own shims shadow the kit's defaults --
+# which is why include/ has always been first, and cflib/ belongs beside
+# it rather than after.  The kit's directory is still on
 # the path for the headers the kit ships beside gem.h (sys/stat.h,
 # mint/cookie.h) and cflib's for <cflib.h>.
-INC   = -I include -I $(KIT)/include -I $(CFLIB_SRC)
+INC   = -I include -I cflib -I $(KIT)/include -I $(CFLIB_SRC)
 
 QED_CFLAGS   = $(MODEL) --char-is-unsigned $(DEFS) $(INC) -I ../src
-CFLIB_CFLAGS = $(MODEL) $(DEFS) -I cflib $(INC)
-PORT_CFLAGS  = $(MODEL) $(DEFS) $(INC) -I cflib
+CFLIB_CFLAGS = $(MODEL) $(DEFS) $(INC)
+PORT_CFLAGS  = $(MODEL) $(DEFS) $(INC)
 KIT_CFLAGS   = $(MODEL) -I $(KIT)/include
 
 # -- sources -----------------------------------------------------------------
@@ -118,7 +130,8 @@ PORT_OBJS = $(B)/port/qed4xe.o $(B)/port/qedmem.o $(B)/port/qedstub.o $(B)/port/
 # Save as... -- qed asked for the time, the C library's localtime()
 # divided a 64-bit time_t, and the machine took a BRK inside a string.
 KIT_OBJS = $(KIT)/crt_gemapp.o $(KIT)/gemabi.o $(KIT)/gemlib.o \
-           $(KIT)/gemstat.o $(KIT)/gemtime.o $(KIT)/gemstub.o
+           $(KIT)/gemstat.o $(KIT)/gemtime.o $(KIT)/gemcompat.o \
+           $(KIT)/gemstub.o
 
 # -- the kit, snapshotted ----------------------------------------------------
 
