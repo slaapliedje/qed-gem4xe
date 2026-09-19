@@ -112,8 +112,13 @@ PORT_OBJS = $(B)/port/qed4xe.o $(B)/port/qedmem.o $(B)/port/qedstub.o $(B)/port/
 # The kit's objects, less lib/clib.c: that file is the kit's GPL str*
 # functions and its refusal of malloc.  QED is public domain, so Calypsi's
 # str* may be linked, and QED has a heap of its own (src/qedmem.c).
+# gemtime.o carries the kit's <time.h>: a 32-bit time_t, so that nothing
+# here reaches Calypsi's _Div64, which falls through into whatever the
+# linker placed after it (gem4xe tools/ccbug, B20).  That is what killed
+# Save as... -- qed asked for the time, the C library's localtime()
+# divided a 64-bit time_t, and the machine took a BRK inside a string.
 KIT_OBJS = $(KIT)/crt_gemapp.o $(KIT)/gemabi.o $(KIT)/gemlib.o \
-           $(KIT)/gemstat.o $(KIT)/gemstub.o
+           $(KIT)/gemstat.o $(KIT)/gemtime.o $(KIT)/gemstub.o
 
 # -- the kit, snapshotted ----------------------------------------------------
 

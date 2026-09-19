@@ -98,6 +98,20 @@ MIN_LIST_INK = 200      # six filenames of black text in the list box
 # screen: the picture alone cannot tell a drawn list from a frozen one.
 SDX_STUB_AT = 0x08C0
 SDX_STUB = bytes((0x0A, 0xBD, 0x02, 0x0A, 0xCD, 0x24, 0x0A, 0xF0, 0x03))
+# Saving: the Selection field (its label runs to x~260, the field beyond),
+# the OK button, and the name to write.
+SEL_FIELD = (300, 80)
+OK_BTN = (267, 201)
+SAVE_NAME = "TEST.TXT"
+KEYNAME = {".": "PERIOD", "_": "MINUS", " ": "SPACE"}
+# The row the SEVENTH name lands on once the save has made one.  Measured,
+# not guessed, and the first attempt was guessed and WRONG: it read 106
+# black pixels on a row that was supposed to be empty, so it would have
+# passed whether or not anything was saved.  With six files the name rows
+# are y 109..155 and 156..162 is blank; the seventh name fills 157..163.
+# Ink here is 2 px before the save and 148 after.
+LIST_ROW7 = (210, 350, 157, 163)
+MIN_ROW7_INK = 40
 
 
 def s16(v):
@@ -314,6 +328,58 @@ def main():
                 problems.append(
                     f"the selector's name list drew {ink} black pixels, under "
                     f"{MIN_LIST_INK}: the directory read answered nothing")
+
+        # -- and it SAVES ---------------------------------------------------
+        # Checked IN THE MACHINE: type a name, click OK, then reopen the
+        # selector and require the file in its listing.  The host cannot
+        # check the disk image here -- this run boots SpartaDOS X from a
+        # CARTRIDGE, so the ATR is not the boot image and Altirra keeps
+        # its writes out of the file -- and the listing is the better
+        # question anyway: it is what the DOS believes, read back through
+        # the same path a user would.
+        def click(pos):
+            move_to(pos)
+            b.joy(JOY_PORT, "centre", fire=True); b.frames(8)
+            b.joy(JOY_PORT, "centre", fire=False); b.frames(20)
+
+        def pick(item_y):
+            """The File menu, dragged to an item and released -- the same
+            press-drag-release the two steps above do by hand."""
+            move_to((FILE_X, BAR_Y))
+            b.joy(JOY_PORT, "centre", fire=True); b.frames(14)
+            move_to((FILE_X, item_y), speed=4); b.frames(4)
+            b.joy(JOY_PORT, "centre", fire=False); b.frames(120)
+
+        click(SEL_FIELD)
+        for ch in SAVE_NAME:
+            b.key(KEYNAME.get(ch, ch))
+            b.frames(10)
+        b.frames(20)
+        click(OK_BTN)
+        b.frames(300)
+        shot4 = os.path.join(os.path.dirname(SHOT), "qed-g4a-saved.png")
+        b.screenshot(shot4)
+        title = black_ink(shot4, 42, 52)
+        r = b.cmd("REGS")
+        print(f"  saved     window title redrawn ({title} px); "
+              f"PC={r['K']}:{r['PC']} E={r['E']}")
+        if r["E"] != 0:
+            problems.append("after OK the machine is in emulation mode: "
+                            "the save wedged it")
+
+        pick(SAVEAS_Y)                  # ...and ask the DOS for the listing
+        shot5 = os.path.join(os.path.dirname(SHOT), "qed-g4a-listing.png")
+        b.screenshot(shot5)
+        ink7 = band_ink(shot5, *LIST_ROW7)
+        print(f"  saved     {ink7} black pixels on the selector's seventh row, "
+              f"where {SAVE_NAME} lands ({shot5})")
+        if ink7 < MIN_ROW7_INK:
+            problems.append(
+                f"after saving {SAVE_NAME} the selector's listing gained no row "
+                f"({ink7} px, under {MIN_ROW7_INK}): the file was not created")
+        click((395, 201))               # Cancel, and leave it as we found it
+        b.frames(60)
+
     finally:
         try:
             b.close()
@@ -329,8 +395,8 @@ def main():
             print(f"FAIL: {p}")
         return 1
     print("qed-gem4xe: PASS -- QED loads a 33 KB resource into far memory, draws "
-          "its menu from it, opens a document, takes typing and lists the disk "
-          "in its file selector, on an Atari 8-bit, 0 problem(s)")
+          "its menu from it, opens a document, takes typing, and SAVES it "
+          "through the file selector, on an Atari 8-bit, 0 problem(s)")
     return 0
 
 
