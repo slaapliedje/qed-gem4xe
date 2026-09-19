@@ -83,6 +83,22 @@ TEXT_TOP, TEXT_BOT = 60, 72
 TYPED = "QED"
 MIN_TEXT_INK = 40       # three 8x8 glyphs of black text
 
+# File > Save as..., the eighth item of the File drop-down, and the name
+# list inside the selector it opens.
+SAVEAS_Y = 70
+LIST_X0, LIST_X1, LIST_Y0, LIST_Y1 = 200, 350, 96, 180
+MIN_LIST_INK = 200      # six filenames of black text in the list box
+# What SpartaDOS X has at $08C0 -- its own code, four bytes before the stub
+# the DOS calls to read a DIRECTORY.  menu_text used to land a menu string
+# on $0008C4 (gem4xe src/aes/menu.c, mn_text: the bank was dropped from a
+# far tree's ob_spec, leaving the string's offset IN THE .RSC FILE, and
+# QED's "  Makefile..." is at offset $08C4).  The DOS then jumped into a
+# BRK on the next directory read and the machine died with the selector
+# drawn -- which is why this is checked at the BYTES as well as at the
+# screen: the picture alone cannot tell a drawn list from a frozen one.
+SDX_STUB_AT = 0x08C0
+SDX_STUB = bytes((0x0A, 0xBD, 0x02, 0x0A, 0xCD, 0x24, 0x0A, 0xF0, 0x03))
+
 
 def s16(v):
     return v - 0x10000 if v & 0x8000 else v
@@ -103,6 +119,19 @@ def black_ink(path, y0, y1):
     im = Image.open(path).convert("RGB")
     px = im.load()
     return sum(1 for y in range(y0, min(y1, im.height)) for x in range(im.width)
+               if sum(px[x, y]) < BLACK)
+
+
+def band_ink(path, x0, x1, y0, y1):
+    """Near-black pixels in a rectangle -- the selector's name list."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    im = Image.open(path).convert("RGB")
+    px = im.load()
+    return sum(1 for y in range(y0, min(y1, im.height))
+               for x in range(x0, min(x1, im.width))
                if sum(px[x, y]) < BLACK)
 
 
@@ -239,6 +268,52 @@ def main():
                     f"the document's first line drew {ink} black pixels, under "
                     f"{MIN_TEXT_INK}: File>New did not open a window, or the "
                     f"typed text was not inserted and painted")
+
+        # -- and it SAVES: File > Save as... opens the selector -------------
+        # Three assertions, because the first two are what a screenshot
+        # cannot see.  The DOS's own bytes first: a menu string written
+        # over them is the defect this step exists for, and it shows up
+        # here BEFORE the selector is even opened.
+        stub = bytes(b.memdump(SDX_STUB_AT, len(SDX_STUB)))
+        print(f"  dos       SpartaDOS X at ${SDX_STUB_AT:04X}: {stub.hex(' ')}")
+        if stub != SDX_STUB:
+            problems.append(
+                f"SpartaDOS X's code at ${SDX_STUB_AT:04X} reads {stub.hex(' ')}, "
+                f"not {SDX_STUB.hex(' ')}: something has written over the DOS")
+
+        move_to((FILE_X, BAR_Y))
+        b.joy(JOY_PORT, "centre", fire=True)
+        b.frames(14)
+        move_to((FILE_X, SAVEAS_Y), speed=4)
+        b.frames(4)
+        b.joy(JOY_PORT, "centre", fire=False)
+        b.frames(120)
+
+        # Still RUNNING, and still native: the failure mode was the CPU
+        # stopped in the OS's break dispatch in emulation mode, with the
+        # selector's picture left on the screen looking perfectly healthy.
+        r0 = b.cmd("REGS")
+        b.frames(30)
+        r1 = b.cmd("REGS")
+        moved, native = r1["cycles"] != r0["cycles"], r1["E"] == 0
+        print(f"  selector  after Save as: PC=${int(r1['PC'].lstrip('$'), 16):04X} "
+              f"bank {r1['K']} E={r1['E']} running={moved}")
+        if not (moved and native):
+            problems.append(
+                f"after File>Save as... the machine is "
+                f"{'stopped' if not moved else 'in emulation mode'} at "
+                f"{r1['K']}:{r1['PC']} -- the directory read wedged it")
+
+        shot3 = os.path.join(os.path.dirname(SHOT), "qed-g4a-fsel.png")
+        b.screenshot(shot3)
+        ink = band_ink(shot3, LIST_X0, LIST_X1, LIST_Y0, LIST_Y1)
+        if ink is not None:
+            print(f"  listing   {ink} black pixels in the selector's name list "
+                  f"({shot3})")
+            if ink < MIN_LIST_INK:
+                problems.append(
+                    f"the selector's name list drew {ink} black pixels, under "
+                    f"{MIN_LIST_INK}: the directory read answered nothing")
     finally:
         try:
             b.close()
@@ -254,8 +329,8 @@ def main():
             print(f"FAIL: {p}")
         return 1
     print("qed-gem4xe: PASS -- QED loads a 33 KB resource into far memory, draws "
-          "its menu from it, opens a document and takes typing, on an Atari "
-          "8-bit, 0 problem(s)")
+          "its menu from it, opens a document, takes typing and lists the disk "
+          "in its file selector, on an Atari 8-bit, 0 problem(s)")
     return 0
 
 
