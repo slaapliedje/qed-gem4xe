@@ -41,12 +41,6 @@ LONG qed4xe_Psignal(WORD sig, long handler)
 
 /* -- the AES calls that assume other applications ----------------------- */
 
-WORD appl_find(const char *name)
-{
-    (void)name;
-    return -1;                      /* no application of that name: there is one, and it is us */
-}
-
 WORD appl_search(WORD mode, char *name, WORD *type, WORD *ap_id)
 {
     (void)mode; (void)name; (void)type; (void)ap_id;
@@ -54,15 +48,6 @@ WORD appl_search(WORD mode, char *name, WORD *type, WORD *ap_id)
 }
 
 /* -- the AES calls cflib reaches that assume a richer AES ---------------- */
-
-WORD objc_sysvar(WORD mode, WORD which, WORD in1, WORD in2,
-                 WORD *out1, WORD *out2)
-{
-    (void)mode; (void)which; (void)in1; (void)in2;
-    if (out1) *out1 = 0;            /* no 3D frame inflation on this AES */
-    if (out2) *out2 = 0;
-    return 0;
-}
 
 WORD objc_change_grect(OBJECT *tree, WORD obj, WORD depth, const GRECT *r,
                        WORD newstate, WORD redraw)

@@ -10,6 +10,13 @@
 #define QED4XE_H
 
 #include <stddef.h>
+/* stricmp, strnicmp, strlwr, strupr: the kit HAS them (gemcompat.c), but
+ * an ST source gets them out of <string.h> and so never asks for a header
+ * of its own.  av.c, dd.c and text.c were calling them through an
+ * IMPLICIT declaration -- which linked here only because Calypsi's int
+ * is sixteen bits and happens to be what they return.  One include, at
+ * the one door every translation unit already passes. */
+#include <support.h>
 
 /* -- names the kit spells differently ---------------------------------- */
 
@@ -20,14 +27,6 @@
 #define WF_VSLSIZE  WF_VSLSIZ           /* 16 */
 #endif
 
-/* WF_OWNER (20) -- wind_get's "who owns this window".  QED's av.c and dd.c
- * ask it to route a drag-drop; there is one application, so the answer is
- * always this one, and the AES here does not track owners.  The value is
- * the ST's (cflib.h). */
-#ifndef WF_OWNER
-#define WF_OWNER  20
-#endif
-
 /* SH_WDRAW (72) -- shel_write's "redraw the desktop window" opcode, which
  * QED's event.c passes on.  There is no second application to ask; the
  * name is what event.c needs to compile. */
@@ -36,8 +35,9 @@
 #endif
 
 /* AES 4's drag-and-drop message.  cflib's ddcreate.c sends it to the
- * application it found with appl_find, which here finds nobody, so no one
- * ever receives it; the name is needed for the file to compile. */
+ * application it found with appl_find -- which answers a real pid now,
+ * but only ever this program's or an accessory's, and neither is a
+ * drag-drop server; the name is needed for the file to compile. */
 #ifndef AP_DRAGDROP
 #define AP_DRAGDROP 63
 #endif
@@ -103,20 +103,15 @@ LONG qed4xe_Psignal(WORD sig, long handler);
 
 /* -- the AES calls that assume other applications ----------------------- */
 
-/* appl_find answers the id of a named application; there is one
- * application, and it is never the one asked for (an AV server, a shell).
- * appl_search walks the AES's process list, which has one entry. */
-WORD appl_find(const char *name);
+/* appl_find is the KIT's since gem4xe 751d956: the AES names every
+ * process after the file the shell loaded it from and searches them, so
+ * a name this program asks for is found if an accessory carries it.
+ * appl_search is AES 4.0's, gated there on appl_getinfo, and gem4xe
+ * reports 1.40 -- so it stays here, answering what a one-entry list
+ * answers. */
 WORD appl_search(WORD mode, char *name, WORD *type, WORD *ap_id);
 
 /* -- the AES calls cflib reaches that assume a richer AES ---------------- */
-
-/* objc_sysvar (AES 48) asks the 3D object system for a setting; cflib's
- * obgframe.c asks AD3DVAL (6), how many pixels a 3D object's frame is
- * inflated.  gem4xe draws no 3D objects, so 0/0 is the true answer, not
- * merely a linkable one (cflib4xe FINDINGS.md 2). */
-WORD objc_sysvar(WORD mode, WORD which, WORD in1, WORD in2,
-                 WORD *out1, WORD *out2);
 
 /* objc_change_grect -- gemlib's objc_change taking a GRECT.  cflib's
  * ppmenu.c highlights a popup item through it.  The kit has objc_change,
