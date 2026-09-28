@@ -120,10 +120,10 @@ WORD appl_search(WORD mode, char *name, WORD *type, WORD *ap_id);
 WORD objc_change_grect(OBJECT *tree, WORD obj, WORD depth, const GRECT *r,
                        WORD newstate, WORD redraw);
 
-/* menu_popup (AES 36) -- not served here.  cflib's cf_menu_popup calls it
- * only after appl_xgetinfo(9) reports the AES has it, which answers 0, so
- * it is never reached; the MENU type is the kit's. */
-WORD menu_popup(MENU *m1, WORD x, WORD y, MENU *m2);
+/* menu_popup (AES 36) is THE KIT'S now -- declared in its gem.h and
+ * served by the AES since 2026-09-19 -- so there is no declaration here.
+ * cflib's cf_menu_popup calls it once appl_xgetinfo(9) reports the AES
+ * has it, which it now does, so the path is live rather than dead. */
 
 /* Fselect -- MiNT's select().  cflib's ddcreate.c waits on a drag-drop
  * pipe with it.  There are no pipes and no second application, so nothing

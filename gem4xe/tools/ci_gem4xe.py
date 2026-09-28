@@ -22,7 +22,9 @@ so a read in progress is indistinguishable from a failure at any single
 sample.  A 355 KB read lands later than RetroWP's 202 KB, so the wait is
 longer.  A timeout says how far the read got, not merely "failed".
 
-QED GOES ON THE DISK AS DESKTOP.G4A and its resource as QED.RSC; QED asks
+QED GOES ON THE DISK AS QED.PRG, launched from gem4xe's own desktop
+(DESKTOP.PRG -- the shell's name for it since gem4xe's e9213f3), and its
+resource as QED.RSC; QED asks
 for "qed.rsc" through shel_find and SpartaDOS X, case-insensitive, finds
 it.  The symbols MUST be the gem.sym beside the GEM.COM on the disk: they
 are read by address, so a mismatched pair answers plausible nonsense
@@ -42,9 +44,18 @@ GEM4XE = os.environ.get("GEM4XE", os.path.expanduser("~/dev/gem4xe"))
 # stack all live -- so an unpatched build measures the emulator, not QED.
 os.environ.setdefault("ALTIRRASDL", os.path.expanduser("~/dev/altirra-patched/AltirraSDL"))
 sys.path.insert(0, os.path.join(GEM4XE, "tools"))
+# ...and gem4xe's own gate helpers, so the walk over the desktop's object
+# tree is THE SAME CODE its gates use rather than a second copy that can
+# drift: obj/children/placed/cstring/middle read the tree out of the
+# target, and desk_g finds G whichever memory the desktop keeps it in.
+sys.path.insert(0, os.path.join(GEM4XE, "tests", "emu"))
 
 from a8test.launcher import launch            # noqa: E402
 import symfile                                # noqa: E402
+from shots import obj, children, placed, cstring, middle   # noqa: E402
+from m17_desktop import desk_g                # noqa: E402
+from deskref import g_offset, DROOT, WOBS_START   # noqa: E402
+from aesref import W_FULLER                   # noqa: E402
 
 DISK = os.path.join(ROOT, "build", "QED.ATR")
 G4A = os.path.join(ROOT, "build", "QED.G4A")
@@ -155,7 +166,8 @@ def main():
         if not os.path.isfile(need):
             print(f"FAIL: {need} is missing -- run `make check` (builds it) first")
             return 1
-    want_len = os.path.getsize(G4A)
+    desk_g4a = os.path.join(GEM4XE, "build", "desktop.g4a")
+    want_len = os.path.getsize(desk_g4a)   # the SHELL reads the desktop
     link_near = link_near_of(G4A)
     rsc_len = os.path.getsize(RSC)
 
@@ -192,7 +204,9 @@ def main():
         if ln != want_len:
             problems.append(f"read {ln} bytes, the file is {want_len}")
 
-        # -- wait for the program to load ---------------------------------
+        # -- wait for THE DESKTOP to load ---------------------------------
+        # It is the shell's own program, and the one the read above was of.
+        # qed comes later, launched from it.
         near = 0
         while frames < 11000:
             near = b.peek16(sysm["app_near"])
@@ -202,39 +216,18 @@ def main():
             frames += 200
         runs = b.peek16(sysm["sh_runs"])
         rc, ret = s16(b.peek16(sysm["sh_lastrc"])), s16(b.peek16(sysm["sh_lastret"]))
-        print(f"  load      app_near=${near:04X} (linked ${link_near:04X}), "
-              f"sh_runs={runs}, sh_lastrc={rc} ({ERR.get(rc, '?')}), "
-              f"sh_lastret={ret}")
+        print(f"  desktop   app_near=${near:04X}, sh_runs={runs}, "
+              f"sh_lastrc={rc} ({ERR.get(rc, '?')}), sh_lastret={ret}")
         if not near:
             problems.append(
                 f"app_near stayed 0 through {frames} frames, sh_lastrc {rc} "
                 f"({ERR.get(rc, '?')}).  Before reading this as a load failure, "
                 f"check {sym_path} belongs to the GEM.COM on the disk")
+            return 1
         if rc not in (0, None):
             problems.append(f"sh_lastrc {rc} ({ERR.get(rc, '?')}), expected APP_OK")
+        b.frames(900)                   # let the desk draw its icons
 
-        # -- QED runs its own start-up: appl_init, rsrc_load (far), the
-        #    menu bar, an empty edit window -- give it time, then look ----
-        if near:
-            b.frames(1200)
-        b.screenshot(SHOT)
-        bar = black_ink(SHOT, 0, BAR_ROWS)
-        body = black_ink(SHOT, BODY_TOP, BODY_BOT)
-        if bar is None:
-            print(f"  screen    {SHOT} (no PIL here, so not measured)")
-        else:
-            print(f"  menu bar  {bar} black pixels of title text ({SHOT})")
-            print(f"  desktop   {body} black pixels below the bar (empty at start-up)")
-            if bar < MIN_BAR_INK:
-                problems.append(f"the menu bar drew {bar} pixels of black text, "
-                                f"under {MIN_BAR_INK}: qed.rsc did not load far, "
-                                f"or its menu did not draw")
-
-        # -- and it EDITS: File > New text, then type ----------------------
-        # The menu is opened by a PRESS, not a hover: gem4xe's menu manager
-        # waits on MU_BUTTON | MU_M1 and QED asks for MU_M1 only when
-        # mouse_sleeps(), so moving onto the bar drops nothing.  Classic
-        # GEM from there: drag down the drop-down, release over the item.
         ptr = sysm["ptr_state"]
 
         def at():
@@ -258,6 +251,120 @@ def main():
                 poke16(ptr + 2, round(src[1] + dy * t))
                 b.frames(1)
 
+        def dclick(pos):
+            """Two clicks inside the double-click time, the way a person
+            opens an icon: the AES holds the first press for the whole
+            delay before it decides, so the second has to land inside it."""
+            move_to(pos)
+            b.joy(JOY_PORT, "centre", fire=True); b.frames(2)
+            b.joy(JOY_PORT, "centre", fire=False); b.frames(2)
+            b.joy(JOY_PORT, "centre", fire=True); b.frames(2)
+            b.joy(JOY_PORT, "centre", fire=False); b.frames(20)
+
+        def click1(pos):
+            move_to(pos)
+            b.joy(JOY_PORT, "centre", fire=True); b.frames(14)
+            b.joy(JOY_PORT, "centre", fire=False); b.frames(20)
+
+        def gadget(which):
+            """A gadget of the window on top, as W_ACTIVE was last laid
+            out (gem4xe src/aes/wind.c)."""
+            return middle(placed(b, sysm["W_ACTIVE"])[which])
+
+        def screen_tree():
+            """The desktop's g_screen, wherever its G lives -- far bss for a
+            large-data build (gem4xe src/sys/app.c exports app_far)."""
+            return desk_g(b, sysm) + g_offset("g_screen")
+
+        def desk_icon(label):
+            tree = screen_tree()
+            rects = placed(b, tree)
+            for i in children(b, tree, DROOT):
+                if i < WOBS_START:
+                    continue
+                if cstring(b, obj(b, tree, i)["spec"] + 34) == label:
+                    return middle(rects[i])
+            raise KeyError(label)
+
+        def win_item(name):
+            """An entry of the window on top, by the start of its label."""
+            tree = screen_tree()
+            rects = placed(b, tree)
+            seen = []
+            for top in reversed(children(b, tree, 0)):
+                if top == DROOT or not children(b, tree, top):
+                    continue
+                for i in children(b, tree, top):
+                    o = obj(b, tree, i)
+                    text = (cstring(b, o["spec"] + 34) if o["type"] & 0xFF == 31
+                            else cstring(b, o["spec"], 48))
+                    seen.append(text.strip())
+                    if text.strip().startswith(name):
+                        return middle(rects[i])
+                break
+            raise KeyError(f"{name} is not in the window on top: {seen}")
+
+        # -- RUN QED FROM THE DESKTOP -------------------------------------
+        # Not as the desktop.  This is the whole point of the arrangement:
+        # the shell stays in place, and qed is one program it launched --
+        # which is what anything later (a second application, an accessory
+        # that outlives a program, multitasking) needs to be true.
+        try:
+            dclick(desk_icon("DISK A"))
+            b.frames(400)
+            # ...and GROW IT: the disk carries eight files and an unfulled
+            # window shows four, so QED.PRG -- alphabetically after GEM.COM
+            # -- is below the fold.  The fuller is what a person reaches
+            # for, and it keeps this gate from depending on how many files
+            # happen to fit.
+            click1(gadget(W_FULLER))
+            b.frames(300)
+            dclick(win_item("QED.PRG"))
+        except KeyError as e:
+            print(f"FAIL: the desktop's window does not show it: {e}")
+            return 1
+        started, frames2 = 0, 0
+        while frames2 < 9000:
+            if b.peek16(sysm["sh_runs"]) >= 2:
+                started = 1
+                break
+            b.frames(200)
+            frames2 += 200
+        near = b.peek16(sysm["app_near"])
+        rc = s16(b.peek16(sysm["sh_lastrc"]))
+        print(f"  launched  sh_runs={b.peek16(sysm['sh_runs'])} "
+              f"(1 is the desktop, 2 is qed), app_near=${near:04X} "
+              f"(linked ${link_near:04X}), sh_lastrc={rc} ({ERR.get(rc, '?')})")
+        if not started:
+            problems.append(
+                f"sh_runs never reached 2 in {frames2} frames, sh_lastrc {rc} "
+                f"({ERR.get(rc, '?')}) -- the desktop did not run QED.PRG.  "
+                f"APP_E_POOL here means its near region no longer fits beside "
+                f"the desktop (gem4xe tools/memreport.py says what is free)")
+            return 1
+
+        # -- QED runs its own start-up: appl_init, rsrc_load (far), the
+        #    menu bar, an empty edit window -- give it time, then look ----
+        if near:
+            b.frames(1200)
+        b.screenshot(SHOT)
+        bar = black_ink(SHOT, 0, BAR_ROWS)
+        body = black_ink(SHOT, BODY_TOP, BODY_BOT)
+        if bar is None:
+            print(f"  screen    {SHOT} (no PIL here, so not measured)")
+        else:
+            print(f"  menu bar  {bar} black pixels of title text ({SHOT})")
+            print(f"  desktop   {body} black pixels below the bar (empty at start-up)")
+            if bar < MIN_BAR_INK:
+                problems.append(f"the menu bar drew {bar} pixels of black text, "
+                                f"under {MIN_BAR_INK}: qed.rsc did not load far, "
+                                f"or its menu did not draw")
+
+        # -- and it EDITS: File > New text, then type ----------------------
+        # The menu is opened by a PRESS, not a hover: gem4xe's menu manager
+        # waits on MU_BUTTON | MU_M1 and QED asks for MU_M1 only when
+        # mouse_sleeps(), so moving onto the bar drops nothing.  Classic
+        # GEM from there: drag down the drop-down, release over the item.
         move_to((FILE_X, BAR_Y))
         b.joy(JOY_PORT, "centre", fire=True)
         b.frames(14)                    # through the double-click delay

@@ -40,13 +40,11 @@ extern CF_GEMPARBLK _GemParBlk;
  * global[0] with it (0x0140 here), and the kit declares global[]. */
 #define _AESversion  global[0]
 
-/* appl_xgetinfo -- gemlib's, which cflib expects to exist: its own
- * xgetinfo.c is entirely inside #if __PUREC__ && !_GEMLIB_COMPATIBLE and so
- * compiles to nothing here.  cflib.h:377 guards the declaration with
- * #ifndef appl_xgetinfo, so ours may own the name.  It answers the font
- * queries from graf_handle -- see cflibc.c for why a plain `return 0`
- * would lay every dialog out to a font height this machine does not have. */
-WORD appl_xgetinfo(WORD type, WORD *out1, WORD *out2, WORD *out3, WORD *out4);
+/* appl_xgetinfo -- THE KIT'S now.  gem4xe grew appl_getinfo (AES 130) on
+ * 2026-09-19 and its gem.h declares both names, so this port neither
+ * declares nor defines one: src/aes/appl.c answers the font types with
+ * the same cell height this shim used to take from graf_handle, and
+ * answers the others truthfully instead of 0. */
 
 /* DTA member spellings.  The kit's DTA is the ST's -- d_attrib, d_time,
  * d_date, d_length, d_fname -- and cflib reaches for mintlib's.  Same 44

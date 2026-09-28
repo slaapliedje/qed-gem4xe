@@ -36,8 +36,21 @@ GEM4XE     ?= $(HOME)/dev/gem4xe
 CFLIB_SRC  ?= $(HOME)/dev/cflib4xe/upstream/cflib
 CALYPSI    ?= $(HOME)/dev/toolchains/calypsi-65816
 
-BSS    ?= 8192
-BITS   ?= 3072
+# WHAT THE MAP SAYS IT USES, not round numbers -- because the near region
+# is a page-aligned slice of gem4xe's 14 KB application pool, and asking
+# for more than you use is what decided whether qed could be LAUNCHED from
+# the desktop or had to replace it.
+#
+# It asked 8192/3072 and the map answered 62.8% of the bss (5,145 bytes,
+# of which 4,096 is the stack and 1,045 the three QED_NEAR objects) and
+# 1.0% of the bits (31 bytes).  256 + 5632 + 256 is 6,144 -- twenty-four
+# pages exactly -- against a pool that has about 9.4 KB free with the
+# desktop and two accessories resident (gem4xe tools/memreport.py).
+#
+# Replacing the desktop was never a good arrangement: a machine that may
+# one day multitask wants its shell left in place.
+BSS    ?= 5632
+BITS   ?= 256
 STACK  ?= 4096
 CBANKS ?= 6
 FBANKS ?= 1
@@ -121,9 +134,11 @@ CFLIB_OBJS = $(patsubst $(CFLIB_SRC)/%.c,$(B)/cflib/%.o,$(CFLIB_SRCS))
 
 PORT_OBJS = $(B)/port/qed4xe.o $(B)/port/qedmem.o $(B)/port/qedstub.o $(B)/port/cflibc.o
 
-# The kit's objects, less lib/clib.c: that file is the kit's GPL str*
-# functions and its refusal of malloc.  QED is public domain, so Calypsi's
-# str* may be linked, and QED has a heap of its own (src/qedmem.c).
+# The kit's objects, less lib/clib.c: that file is the kit's str*
+# functions and its refusal of malloc.  QED needs a malloc, so Calypsi's
+# str* are linked instead, and QED has a heap of its own (src/qedmem.c).
+# The kit is LGPL-2.1-or-later (its COPYING.LIB), which is what lets QED
+# keep its own terms.
 # gemtime.o carries the kit's <time.h>: a 32-bit time_t, so that nothing
 # here reaches Calypsi's _Div64, which falls through into whatever the
 # linker placed after it (gem4xe tools/ccbug, B20).  That is what killed
@@ -206,23 +221,40 @@ all: $(B)/QED.G4A $(B)/QED.RSC
 
 # -- the boot disk and the gate ---------------------------------------------
 #
-# QED goes on a SpartaDOS floppy as DESKTOP.G4A -- gem4xe's shell reads that
-# name off the boot disk and runs it -- beside its own resource as QED.RSC,
-# which QED asks for as "qed.rsc" through shel_find (SDX is case-insensitive).
-# The disk carries gem4xe's GEM.COM (its build/gem.xex) and nothing of the
-# DOS: SpartaDOS X comes from the cartridge.  The base floppy and the
-# cartridge are the two fixtures gem4xe names in its fixtures.toml.
+# QED goes on a SpartaDOS floppy as an APPLICATION the desktop launches,
+# beside its own resource as QED.RSC, which QED asks for as "qed.rsc"
+# through shel_find (SDX is case-insensitive).
+#
+# IT USED TO BE DESKTOP.G4A -- gem4xe's shell reads that name off the boot
+# disk and runs it -- because it could not fit beside the desktop: it asked
+# 11,520 bytes of a 14,336-byte pool that already held the desktop and its
+# resource.  Two changes on 2026-09-20 ended that: gem4xe's rs_load now
+# puts a resource in far memory for any caller that can hold a 32-bit
+# pointer (so DESKTOP.RSC left bank $00), and QED's own near request came
+# down to the 6,144 its map supports.  A program that IS the shell can
+# never be one of several, so this matters for anything later -- a second
+# application, an accessory outliving a program, multitasking.
+#
+# The disk carries gem4xe's GEM.COM (its build/gem.xex), its desktop and
+# the resources the desktop wants, and nothing of the DOS: SpartaDOS X
+# comes from the cartridge.  The base floppy and the cartridge are the two
+# fixtures gem4xe names in its fixtures.toml.
 
 GEM4XE_XEX  ?= $(GEM4XE)/build/gem.xex
 GEM4XE_SYM  ?= $(GEM4XE)/build/gem.sym
 GEM4XE_FIX  := $(shell python3 -c "import tomllib;print(tomllib.load(open('$(GEM4XE)/fixtures.toml','rb'))['spartados']['disk_32'])" 2>/dev/null)
 GEM4XE_CART := $(shell python3 -c "import tomllib;print(tomllib.load(open('$(GEM4XE)/fixtures.toml','rb'))['spartados']['sdx_cart'])" 2>/dev/null)
 
-$(B)/QED.ATR: $(B)/QED.G4A $(B)/QED.RSC $(GEM4XE_XEX)
+GEM4XE_DESK := $(GEM4XE)/build/desktop.g4a
+$(B)/QED.ATR: $(B)/QED.G4A $(B)/QED.RSC $(GEM4XE_XEX) $(GEM4XE_DESK)
 	@test -n "$(GEM4XE_FIX)" || { echo "no SpartaDOS floppy: set [spartados].disk_32 in $(GEM4XE)/fixtures.toml"; exit 1; }
 	python3 $(GEM4XE)/tools/mkspdisk.py "$(GEM4XE_FIX)" $(GEM4XE_XEX) $@ \
-	    --sectors 4096 --name GEM.COM --boot GEM \
-	    --add $(B)/QED.G4A DESKTOP.G4A \
+	    --sectors 8192 --name GEM.COM --boot GEM \
+	    --add $(GEM4XE_DESK) DESKTOP.PRG \
+	    --add $(GEM4XE)/build/desktop.rsc DESKTOP.RSC \
+	    --add $(GEM4XE)/build/prefs.rsc PREFS.RSC \
+	    --add $(GEM4XE)/build/lang.rsc LANG.RSC \
+	    --add $(B)/QED.G4A QED.PRG \
 	    --add $(B)/QED.RSC QED.RSC
 
 # A recording of QED being used, for showing people: build/movie/qed.mp4

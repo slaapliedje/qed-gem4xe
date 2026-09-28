@@ -56,11 +56,14 @@ WORD objc_change_grect(OBJECT *tree, WORD obj, WORD depth, const GRECT *r,
                        newstate, redraw);
 }
 
-WORD menu_popup(MENU *m1, WORD x, WORD y, MENU *m2)
-{
-    (void)m1; (void)x; (void)y; (void)m2;
-    return 0;                       /* not served; cf_menu_popup never reaches here */
-}
+/* menu_popup is GONE: gem4xe serves AES opcode 36 since 2026-09-19 and
+ * the kit's gemlib.c defines the binding, so a copy here would be a
+ * duplicate symbol -- the same collision a70a4ec resolved for appl_find
+ * and objc_sysvar.  And it is not merely a link question: cflib gates its
+ * popup layer on appl_xgetinfo(9), which the AES now answers "served", so
+ * qed's five popup sites (find.c, options.c, makro.c, prn_cfg.c, dd.c)
+ * reach a real menu_popup instead of a stub that said "nothing selected".
+ */
 
 WORD Fselect(WORD timeout, LONG *rfds, LONG *wfds, LONG *xfds)
 {

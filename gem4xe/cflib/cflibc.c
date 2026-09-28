@@ -109,29 +109,14 @@ WORD Getrez(void)
     return 2;
 }
 
-/* appl_xgetinfo -- see tos.h for why this exists and why it must not be a
- * plain `return 0`. Types 0 and 1 are gemlib's AES_LARGEFONT and
- * AES_SMALLFONT: out1 the cell height, out2 the font id. gem4xe has one
- * face, so both answer the same cell, taken live from graf_handle rather
- * than from a constant. */
-WORD appl_xgetinfo(WORD type, WORD *out1, WORD *out2, WORD *out3, WORD *out4)
-{
-    WORD wchar, hchar, wbox, hbox;
-
-    switch (type) {
-    case 0:     /* AES_LARGEFONT */
-    case 1:     /* AES_SMALLFONT */
-        if (graf_handle(&wchar, &hchar, &wbox, &hbox) == 0)
-            return 0;                   /* no answer; let cflib fall back */
-        if (out1) *out1 = hchar;        /* the device's real cell height */
-        if (out2) *out2 = 1;            /* the system font */
-        if (out3) *out3 = 0;
-        if (out4) *out4 = 0;
-        return 1;
-    default:
-        return 0;                       /* no appl_getinfo on this AES */
-    }
-}
+/* appl_xgetinfo is GONE, and nothing is lost by it.  This answered types
+ * 0 and 1 (AES_LARGEFONT, AES_SMALLFONT) from graf_handle because gem4xe
+ * had no appl_getinfo; it has one now (AES opcode 130), and src/aes/appl.c
+ * answers those two types with the SAME cell height from the SAME source
+ * -- "the first word is the CELL HEIGHT IN PIXELS, not a point size".  So
+ * the kit's binding replaces this exactly, and keeping a copy would be a
+ * duplicate symbol.  It also stops lying about the other types, which is
+ * what turns cflib's popup layer on (see src/qed4xe.c). */
 
 /* The Calypsi platform stubs that used to live here -- _Stub_write and
  * its six companions over GEMDOS -- are GONE. The kit ships lib/gemstub.c
