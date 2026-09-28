@@ -1,0 +1,56 @@
+QED for gem4xe -- what the program is made of, and on what terms
+=================================================================
+
+QED.PRG is one program linked from four parts.  Each keeps its own terms.
+
+1. QED
+   https://github.com/freemint/qed
+
+   Written by Tom Quellenberg; maintained by Christian Felsch (3.20-4.53),
+   Heiko Achilles (5.0-5.0.2) and the FreeMiNT project since 2002.  From
+   version 3.09, in the author's words (dist/liesmich.txt, October 1994):
+   QED including its sources is public domain.  Anyone may have the
+   sources, change them and publish changed versions.  What the author
+   forbids is distributing the sources or the program for a fee of any
+   kind.
+
+   The gem4xe port's own files are under the same terms.
+
+   SO THIS PROGRAM MAY BE GIVEN AWAY, BUT NOT SOLD, alone or as part of
+   anything else.
+
+2. The gem4xe application kit
+   https://github.com/slaapliedje/gem4xe
+
+   The start-up code and GEM bindings every gem4xe program links.
+   GNU Lesser General Public License, version 2.1 or (at your option) any
+   later version; the text is COPYING.LIB, beside this file.  Its source
+   is in the gem4xe repository (src/app/, src/portab.h).  This port's
+   source, which is what the LGPL needs to let you relink QED against a
+   changed kit, is this directory.
+
+3. cflib
+   https://github.com/freemint/cflib
+
+   The ST application library QED uses.  GNU Lesser General Public
+   License, version 2.1 or later (COPYING.LIB).  Linked unmodified.
+
+4. The Calypsi C library, from Apache NuttX
+   https://nuttx.apache.org/
+
+   The standard C functions QED calls -- stdio, printf and scanf, the
+   string and number conversions -- come from the Calypsi C library,
+   which is derived from Apache NuttX and modified for Calypsi by Hakan
+   Thorngren.  Apache License, Version 2.0; the text is
+   LICENSE-APACHE-2.0, beside this file.
+
+     Apache NuttX
+     This product includes software developed at
+     The Apache Software Foundation (http://www.apache.org/).
+
+   The compiler's own run-time routines (multiply, divide and the like)
+   are Calypsi's, "Permission to use with the Calypsi tool chain is
+   hereby granted".
+
+There is NO WARRANTY for any part of this program, to the extent the law
+allows.  See each licence for its own terms.
