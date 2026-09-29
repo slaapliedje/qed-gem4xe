@@ -178,6 +178,15 @@ $(B)/qed $(B)/cflib $(B)/port:
 $(B)/qed/%.o: ../src/%.c $(HDRS) | $(B)/qed
 	$(CC) $(QED_CFLAGS) -o $@ $<
 
+# QED's main() is QED's, unchanged -- but it takes the file to open from
+# argv, and a gem4xe program is started with argc 0: the command tail is
+# read with shel_read, as the kit's README says.  So QED's main is
+# compiled as qed_main, and the port's main (src/qed4xe.c) makes argv out
+# of the tail and calls it.  Without this a file dropped on QED.PRG
+# started QED and opened nothing.
+$(B)/qed/main.o: ../src/main.c $(HDRS) | $(B)/qed
+	$(CC) $(QED_CFLAGS) -Dmain=qed_main -o $@ $<
+
 $(B)/cflib/%.o: $(CFLIB_SRC)/%.c $(HDRS) cflib/tos.h | $(B)/cflib
 	$(CC) $(CFLIB_CFLAGS) -o $@ $<
 
@@ -246,7 +255,7 @@ GEM4XE_FIX  := $(shell python3 -c "import tomllib;print(tomllib.load(open('$(GEM
 GEM4XE_CART := $(shell python3 -c "import tomllib;print(tomllib.load(open('$(GEM4XE)/fixtures.toml','rb'))['spartados']['sdx_cart'])" 2>/dev/null)
 
 GEM4XE_DESK := $(GEM4XE)/build/desktop.g4a
-$(B)/QED.ATR: $(B)/QED.G4A $(B)/QED.RSC $(GEM4XE_XEX) $(GEM4XE_DESK)
+$(B)/QED.ATR: $(B)/QED.G4A $(B)/QED.RSC $(GEM4XE_XEX) $(GEM4XE_DESK) tools/doc.txt
 	@test -n "$(GEM4XE_FIX)" || { echo "no SpartaDOS floppy: set [spartados].disk_32 in $(GEM4XE)/fixtures.toml"; exit 1; }
 	python3 $(GEM4XE)/tools/mkspdisk.py "$(GEM4XE_FIX)" $(GEM4XE_XEX) $@ \
 	    --sectors 8192 --name GEM.COM --boot GEM \
@@ -255,7 +264,8 @@ $(B)/QED.ATR: $(B)/QED.G4A $(B)/QED.RSC $(GEM4XE_XEX) $(GEM4XE_DESK)
 	    --add $(GEM4XE)/build/prefs.rsc PREFS.RSC \
 	    --add $(GEM4XE)/build/lang.rsc LANG.RSC \
 	    --add $(B)/QED.G4A QED.PRG \
-	    --add $(B)/QED.RSC QED.RSC
+	    --add $(B)/QED.RSC QED.RSC \
+	    --add tools/doc.txt DOC.TXT
 
 # A recording of QED being used, for showing people: build/movie/qed.mp4
 # and .gif.  Every frame is the emulated machine, driven the way the gate

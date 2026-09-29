@@ -56,6 +56,7 @@ from shots import obj, children, placed, cstring, middle   # noqa: E402
 from m17_desktop import desk_g                # noqa: E402
 from deskref import g_offset, DROOT, WOBS_START   # noqa: E402
 from aesref import W_FULLER                   # noqa: E402
+from sdx816 import find_text                  # noqa: E402
 
 DISK = os.path.join(ROOT, "build", "QED.ATR")
 G4A = os.path.join(ROOT, "build", "QED.G4A")
@@ -114,6 +115,10 @@ SDX_STUB = bytes((0x0A, 0xBD, 0x02, 0x0A, 0xCD, 0x24, 0x0A, 0xF0, 0x03))
 SEL_FIELD = (300, 80)
 OK_BTN = (267, 201)
 SAVE_NAME = "TEST.TXT"
+# File > Open..., the second item, and File > Quit, the last; and the
+# document the gate opens and drops.
+OPEN_Y, QUIT_Y = 24, 133
+DOC_NAME, DOC_FIRST = "DOC.TXT", "FIRST LINE"
 KEYNAME = {".": "PERIOD", "_": "MINUS", " ": "SPACE"}
 # The row the SEVENTH name lands on once the save has made one.  Measured,
 # not guessed, and the first attempt was guessed and WRONG: it read 106
@@ -121,7 +126,9 @@ KEYNAME = {".": "PERIOD", "_": "MINUS", " ": "SPACE"}
 # passed whether or not anything was saved.  With six files the name rows
 # are y 109..155 and 156..162 is blank; the seventh name fills 157..163.
 # Ink here is 2 px before the save and 148 after.
-LIST_ROW7 = (210, 350, 157, 163)
+# DOC.TXT (tools/doc.txt, for the open and the drop below) is one more
+# name before the save, so the new one lands on the EIGHTH row now.
+LIST_ROW7 = (210, 350, 165, 171)
 MIN_ROW7_INK = 40
 
 
@@ -487,6 +494,70 @@ def main():
         click((395, 201))               # Cancel, and leave it as we found it
         b.frames(60)
 
+        # -- and it OPENS a document: File > Open..., the name, OK ---------
+        # DOC.TXT is two CR LF lines (tools/doc.txt), the way an ST or a PC
+        # writes a text file.  Opened through the same selector the save
+        # used, and its first line must be on the screen.
+        pick(OPEN_Y)
+        click(SEL_FIELD)
+        for _ in range(12):
+            b.key("BACKSPACE"); b.frames(2)
+        for ch in DOC_NAME:
+            b.key(KEYNAME.get(ch, ch)); b.frames(8)
+        click(OK_BTN)
+        b.frames(600)
+        shot6 = os.path.join(os.path.dirname(SHOT), "qed-g4a-open.png")
+        b.screenshot(shot6)
+        seen = find_text(shot6, DOC_FIRST)
+        print(f"  opened    {DOC_NAME} through the selector: {DOC_FIRST!r} at {seen}")
+        if seen is None:
+            problems.append(f"File > Open... {DOC_NAME}: its first line is not on "
+                            f"the screen ({shot6})")
+
+        # -- and a document DROPPED on QED.PRG opens with it ---------------
+        # The desktop hands the file over as QED's command tail, and the
+        # port makes argv of it (src/qed4xe.c, main): QED's own main takes
+        # its files from argv.  Quit first, back to the desktop.
+        runs = b.peek16(sysm["sh_runs"])
+        pick(QUIT_Y)
+        for _ in range(60):
+            b.frames(100)
+            if b.peek16(sysm["sh_runs"]) > runs:
+                break
+        b.frames(600)
+        back = b.peek16(sysm["sh_runs"])
+        print(f"  quit      File > Quit: the shell's runs {runs} -> {back} "
+              f"(the desktop again)")
+        if back <= runs:
+            problems.append("File > Quit did not end QED: the desktop never came back "
+                            "(a program's exit() must end it -- the kit's gemstub.c)")
+            return 1
+        try:
+            dclick(desk_icon("DISK A")); b.frames(400)
+            click1(gadget(W_FULLER)); b.frames(300)
+            src, dst = win_item(DOC_NAME), win_item("QED.PRG")
+        except KeyError as e:
+            problems.append(f"back at the desktop, the window does not show it: {e}")
+            src = dst = None
+        if src:
+            runs = b.peek16(sysm["sh_runs"])
+            move_to(src)
+            b.joy(JOY_PORT, "centre", fire=True); b.frames(14)
+            move_to(dst, speed=4); b.frames(6)
+            b.joy(JOY_PORT, "centre", fire=False)
+            for _ in range(90):
+                b.frames(100)
+                if b.peek16(sysm["sh_runs"]) > runs:
+                    break
+            b.frames(1500)
+            shot7 = os.path.join(os.path.dirname(SHOT), "qed-g4a-drop.png")
+            b.screenshot(shot7)
+            seen = find_text(shot7, DOC_FIRST)
+            print(f"  dropped   {DOC_NAME} on QED.PRG: {DOC_FIRST!r} at {seen}")
+            if seen is None:
+                problems.append(f"{DOC_NAME} dropped on QED.PRG: QED started "
+                                f"without it ({shot7})")
+
     finally:
         try:
             b.close()
@@ -502,8 +573,9 @@ def main():
             print(f"FAIL: {p}")
         return 1
     print("qed-gem4xe: PASS -- QED loads a 33 KB resource into far memory, draws "
-          "its menu from it, opens a document, takes typing, and SAVES it "
-          "through the file selector, on an Atari 8-bit, 0 problem(s)")
+          "its menu from it, opens a document, takes typing, SAVES it and OPENS "
+          "one through the file selector, QUITS to the desktop, and opens a "
+          "document dropped on it, on an Atari 8-bit, 0 problem(s)")
     return 0
 
 

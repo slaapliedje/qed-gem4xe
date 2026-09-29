@@ -396,3 +396,45 @@ int select_file(char *path, char *name, char *mask, char *title, FSEL_CB open_cb
     }
     return ok;
 }
+
+/* -- the command line ----------------------------------------------------
+ * QED takes the files to open from argv (main.c, init_all), and a gem4xe
+ * program starts with argc 0: its command tail is read with shel_read,
+ * the ST's length byte and then the text (the kit's README).  So QED's
+ * own main is compiled as qed_main (Makefile) and this makes argv out of
+ * the tail -- which is how the desktop hands over a file dropped on
+ * QED.PRG, or a document installed to open with it.
+ *
+ * The buffers are on the stack because shel_read wants them in bank $00
+ * and a large-data program's statics are far; they live exactly as long
+ * as qed_main runs, which is as long as argv is read. */
+#define QED_ARGS 16
+
+int qed_main(int argc, char *argv[]);
+
+int main(void)
+{
+    char cmd[130], tail[132];
+    char *argv[QED_ARGS];
+    int argc = 0, n, i;
+
+    cmd[0] = '\0';
+    tail[0] = 0;
+    shel_read(cmd, tail);
+    argv[argc++] = cmd;
+    n = (unsigned char)tail[0];
+    if (n > 128)
+        n = 128;
+    tail[1 + n] = '\0';
+    for (i = 1; i <= n && argc < QED_ARGS - 1; ) {
+        while (i <= n && (tail[i] == ' ' || tail[i] == '\r'))
+            tail[i++] = '\0';
+        if (i > n || !tail[i])
+            break;
+        argv[argc++] = &tail[i];
+        while (i <= n && tail[i] && tail[i] != ' ' && tail[i] != '\r')
+            i++;
+    }
+    argv[argc] = 0;
+    return qed_main(argc, argv);
+}
