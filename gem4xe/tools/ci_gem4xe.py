@@ -317,7 +317,7 @@ def main():
         # which is what anything later (a second application, an accessory
         # that outlives a program, multitasking) needs to be true.
         try:
-            dclick(desk_icon("DISK A"))
+            dclick(desk_icon("DISK D1:"))
             b.frames(400)
             # ...and GROW IT: the disk carries eight files and an unfulled
             # window shows four, so QED.PRG -- alphabetically after GEM.COM
@@ -533,7 +533,7 @@ def main():
                             "(a program's exit() must end it -- the kit's gemstub.c)")
             return 1
         try:
-            dclick(desk_icon("DISK A")); b.frames(400)
+            dclick(desk_icon("DISK D1:")); b.frames(400)
             click1(gadget(W_FULLER)); b.frames(300)
             src, dst = win_item(DOC_NAME), win_item("QED.PRG")
         except KeyError as e:
