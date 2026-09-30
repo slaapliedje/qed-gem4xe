@@ -85,7 +85,7 @@ DEFS  = -D_WORD=short -D"_UWORD=unsigned short"
 # mint/cookie.h) and cflib's for <cflib.h>.
 INC   = -I include -I cflib -I $(KIT)/include -I $(CFLIB_SRC)
 
-QED_CFLAGS   = $(MODEL) --char-is-unsigned $(DEFS) $(INC) -I ../src
+QED_CFLAGS   = $(MODEL) --char-is-unsigned $(DEFS) -DQED_BANKED_MALLOC $(INC) -I ../src
 CFLIB_CFLAGS = $(MODEL) $(DEFS) $(INC)
 PORT_CFLAGS  = $(MODEL) $(DEFS) $(INC)
 KIT_CFLAGS   = $(MODEL) -I $(KIT)/include

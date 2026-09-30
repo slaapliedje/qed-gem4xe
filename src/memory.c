@@ -52,6 +52,15 @@ static bool new_block(void)
 	else
 		ptr = NULL;
 
+#ifdef QED_BANKED_MALLOC
+	/* Malloc(-1) answers the largest free block, and where no block may
+	 * cross a 64 KB bank (gem4xe) that is never more than 65532 however
+	 * much is free: the margin below could never be met, so memory was
+	 * short from the first block on and every block operation refused.
+	 * There, memory is short when another block cannot be had. */
+	if (ptr != NULL && (long) Malloc(-1L) >= 4 + MEMSIZE + 4)
+		anz = MEMSIZE + 20000L;
+#endif
 	if (anz < MEMSIZE + 20000L)
 		mem_need_BS = TRUE;
 
