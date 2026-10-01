@@ -514,6 +514,21 @@ def main():
             problems.append(f"File > Open... {DOC_NAME}: its first line is not on "
                             f"the screen ({shot6})")
 
+        # -- and its MENU SHORTCUTS work: Ctrl-N, tapped ----------------------
+        # cflib matches "^N" by the key's ST scan code and K_CTRL.  Before
+        # gem4xe's phase 84 a letter came with no scan code and a tapped
+        # key's CONTROL was gone by the time QED asked, so no shortcut ever
+        # did anything.  A new window is a new "Untitled" title.
+        b.key("N", ctrl=True)
+        b.frames(300)
+        shot_n = os.path.join(os.path.dirname(SHOT), "qed-g4a-ctrl-n.png")
+        b.screenshot(shot_n)
+        seen = find_text(shot_n, "Untitled")
+        print(f"  shortcut  Ctrl-N: a new window's title at {seen}")
+        if seen is None:
+            problems.append(f"Ctrl-N opened no new window: the menu shortcuts do "
+                            f"not reach QED ({shot_n})")
+
         # -- and a document DROPPED on QED.PRG opens with it ---------------
         # The desktop hands the file over as QED's command tail, and the
         # port makes argv of it (src/qed4xe.c, main): QED's own main takes

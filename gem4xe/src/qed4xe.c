@@ -207,9 +207,10 @@ LONG Setprt(WORD config)                    { (void)config; return 0; }
 /* -- the keyboard ---------------------------------------------------------- */
 
 /* What gem4xe's keyboard driver delivers (gem4xe src/vdi/vdi.c,
- * kb_translate): a GEM key code with a PC scan code in the high byte for
- * the keys GEM switches on, and for every other key the character alone,
- * scan code zero.  The modifier state comes beside it in kstate. */
+ * kb_translate): a GEM key code, the ST's scan code in the high byte and
+ * the character in the low one, for every key the two keyboards share --
+ * since gem4xe phase 84; before, only the keys GEM switches on had one.
+ * The modifier state comes beside it in kstate, the key's own. */
 #define SC_ESC    0x01
 #define SC_BS     0x0E
 #define SC_TAB    0x0F
@@ -220,32 +221,72 @@ LONG Setprt(WORD config)                    { (void)config; return 0; }
 #define SC_DOWN   0x50
 #define SC_DEL    0x53
 
-/* Keytbl -- three tables with exactly the entries above, and zero for the
- * scan codes this keyboard never sends.  cflib's menu code (menuisk.c)
- * reads the caps table by a key's scan code to match a shortcut letter;
- * with gem4xe's letters carrying no scan code it will match none, which
- * is the truth of the matter, and QED's own shortcut table (kurzel.c)
- * works from the normalised code, below, rather than from these. */
+/* Keytbl -- the ST's three tables, unshifted, shifted and caps lock, for
+ * the scan codes gem4xe sends, and zero for the ones it never does.
+ * cflib's menu code (menuisk.c) reads the caps table by a key's scan code
+ * to match a shortcut's letter -- the ^N in "New text ^N" -- so with these
+ * QED's menu shortcuts work; with scan codes of zero they matched nothing.
+ * The shifted characters are the Atari's keycaps (SHIFT-2 is ", SHIFT-8
+ * is @), since that is what the key the scan code names types here.
+ * QED's own shortcut table (kurzel.c) works from the normalised code,
+ * below, rather than from these. */
 static unsigned char kt_unshift[128], kt_shift[128], kt_caps[128];
 static KEYTAB kt = { kt_unshift, kt_shift, kt_caps };
 static int kt_ready;
+
+static void kt_set(unsigned char scan, unsigned char un, unsigned char sh, unsigned char caps)
+{
+    kt_unshift[scan] = un;
+    kt_shift[scan]   = sh;
+    kt_caps[scan]    = caps;
+}
+
+static void kt_row(unsigned char scan, const char *un, const char *sh, int letters)
+{
+    for (; *un; un++, sh++, scan++)
+        kt_set(scan, (unsigned char)*un, (unsigned char)*sh,
+               (unsigned char)(letters ? *sh : *un));
+}
 
 KEYTAB *Keytbl(void *unshift, void *shift, void *capslock)
 {
     (void)unshift; (void)shift; (void)capslock;    /* (void *)-1 each: only asking */
     if (!kt_ready) {
-        static const unsigned char pairs[] = {
-            SC_RET, 0x0D, SC_TAB, 0x09, SC_BS, 0x08, SC_ESC, 0x1B, SC_DEL, 0x7F
-        };
-        WORD i;
-        for (i = 0; i < (WORD)sizeof(pairs); i += 2) {
-            kt_unshift[pairs[i]] = pairs[i + 1];
-            kt_shift[pairs[i]]   = pairs[i + 1];
-            kt_caps[pairs[i]]    = pairs[i + 1];
-        }
+        kt_row(0x02, "1234567890", "!\"#$%&'@()", 0);
+        kt_row(0x10, "qwertyuiop", "QWERTYUIOP", 1);
+        kt_row(0x1E, "asdfghjkl",  "ASDFGHJKL",  1);
+        kt_row(0x2C, "zxcvbnm",    "ZXCVBNM",    1);
+        kt_set(0x0C, '-', '_', '-');
+        kt_set(0x0D, '=', '|', '=');
+        kt_set(0x27, ';', ':', ';');
+        kt_set(0x33, ',', '[', ',');
+        kt_set(0x34, '.', ']', '.');
+        kt_set(0x35, '/', '?', '/');
+        kt_set(0x39, ' ', ' ', ' ');
+        kt_set(0x4E, '+', '\\', '+');
+        kt_set(0x66, '*', '^', '*');
+        kt_set(0x60, '<', '>', '<');
+        kt_set(SC_RET, 0x0D, 0x0D, 0x0D);
+        kt_set(SC_TAB, 0x09, 0x09, 0x09);
+        kt_set(SC_BS,  0x08, 0x08, 0x08);
+        kt_set(SC_ESC, 0x1B, 0x1B, 0x1B);
+        kt_set(SC_DEL, 0x7F, 0x7F, 0x7F);
         kt_ready = 1;
     }
     return &kt;
+}
+
+/* The scan code of the key that types c, as gem4xe would send it with c;
+ * 0 for a character no key types. */
+static unsigned char kt_scan(unsigned char c)
+{
+    unsigned short i;
+
+    Keytbl((void *)-1, (void *)-1, (void *)-1);
+    for (i = 1; i < 128; i++)
+        if (kt_unshift[i] == c || kt_shift[i] == c)
+            return (unsigned char)i;
+    return 0;
 }
 
 /* nkc_init -- cflib's builds its own copy of Keytbl's answer; there is
@@ -337,9 +378,12 @@ void norm_to_gem(unsigned long norm, _WORD *ks, _WORD *kr)
         default:       ret = (_WORD)low; break;     /* another control code */
         }
     } else if ((n & NKF_CTRL) && low >= 'A' && low <= 'Z') {
-        ret = (_WORD)(low - 0x40);                  /* Ctrl-letter -> $01..$1A */
+        ret = (_WORD)((kt_scan((unsigned char)low) << 8) | (low - 0x40));
+                                                    /* Ctrl-letter -> $01..$1A,
+                                                     * with the letter's scan */
     } else {
-        ret = (_WORD)low;                           /* a plain character */
+        ret = (_WORD)((kt_scan((unsigned char)low) << 8) | low);
+                                                    /* a character, and its key */
     }
 
     if (ks) *ks = state;
