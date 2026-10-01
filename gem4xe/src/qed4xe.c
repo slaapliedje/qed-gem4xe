@@ -175,12 +175,18 @@ void fix_dial(OBJECT *tree)               { (void)tree; }
 void fix_menu(OBJECT *tree)               { (void)tree; }
 void fix_popup(OBJECT *tree, WORD thin)   { (void)tree; (void)thin; }
 
-/* do_fontsel -- cflib's font selector (fontsel.c), reached only from QED's
- * GDOS printing path, which never runs (vq_vgdos answers -2).  One system
- * font here; 0 is "cancelled", the id and size left as they were. */
+/* do_fontsel -- cflib's font selector (fontsel.c), which asks for xFSL,
+ * the font protocol or MagiC's fnts_*, none of which gem4xe has.  It is
+ * reached from Options > Font as well as the GDOS printing path, and
+ * cflib's answer when there is no selector is FALSE with -1 in both id
+ * and size: QED reads that pair as "none installed" and says so (global.c,
+ * select_font: NOFSL).  Leaving them as they were made the menu item do
+ * nothing at all. */
 WORD do_fontsel(WORD flags, char *title, WORD *id, WORD *pts)
 {
-    (void)flags; (void)title; (void)id; (void)pts;
+    (void)flags; (void)title;
+    *id = -1;
+    *pts = -1;
     return 0;
 }
 
